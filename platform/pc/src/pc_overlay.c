@@ -13,7 +13,7 @@
 #include "audio.h"         /* AUDIO_CMD_STOP_ALL */
 #include "battle.h"        /* gIsEnemyTurn */
 #include <stddef.h>
-#include <stdlib.h>        /* free */
+#include <stdlib.h>        /* free, getenv */
 #include <stdio.h>         /* snprintf */
 #include <string.h>        /* strncpy */
 
@@ -25,6 +25,24 @@ extern int g_btnLabels;   /* overlay button-label style (0=PLAYSTATION, 1=XBOX) 
 extern int g_vhHdPack;    /* HD PACK toggle (pc_gpu_window.c); libgpu's HdDetect() auto-ONs it */
 extern int PC_HdPackAvailable(void);   /* libgpu.c: 1 if a valid HD pack is installed beside the exe */
 extern const char *PC_HdPackStatusShort(void);   /* why the pack is unusable, for the value column */
+
+/* HIDDEN ITEMS: number the overhead map's uncollected hidden items (src/battle/field.c). Loaded
+ * from VH_SHOW_HIDDEN_ITEMS on first use by either the game or the overlay; default OFF. */
+static int s_showHiddenItems = 0;
+static void loadShowHiddenItems(void) {
+    static int loaded = 0;
+    const char *e;
+    if (loaded) return;
+    loaded = 1;
+    e = getenv("VH_SHOW_HIDDEN_ITEMS");
+    s_showHiddenItems = (e && e[0] == '1') ? 1 : 0;
+}
+int PC_ShowHiddenItems(void) { loadShowHiddenItems(); return s_showHiddenItems; }
+#ifdef VH_REGION_JP
+static int dis_jpCore(void)         { return 1; }   /* the JP game links no-op markers */
+#else
+static int dis_jpCore(void)         { return 0; }
+#endif
 
 /* CHOICE value labels for BUTTON LABELS, indexed by g_btnLabels. */
 static const char *const s_btnLabelText[] = { "PLAYSTATION", "XBOX" };
@@ -251,6 +269,8 @@ static Item s_items[] = {
      * how you switch to it (locked = NULL). Return to Title is greyed AND locked at the title. */
     { "TACTICAL MODE",   OVL_TOGGLE, &gTacticalMode,  "tactical", "VH_TACTICAL",
       "OFF", "ON",            0, 0, 0, NULL, apply_tactical,      NULL,           dis_notAtTitle, dis_notAtTitle },
+    { "HIDDEN ITEMS",    OVL_TOGGLE, &s_showHiddenItems, "gameplay", "VH_SHOW_HIDDEN_ITEMS",
+      "OFF", "ON",            0, 0, 0, NULL, NULL,                NULL,           dis_jpCore, dis_jpCore },
     /* Greyed+locked with no valid pack; toggleable + auto-ON when one is installed. apply_hdpack
      * couples it to INTERNAL RES / WINDOW SCALE (see above). */
     { "HD PACK",         OVL_TOGGLE, &g_vhHdPack,     "video",  "VH_HDPACK",
@@ -329,6 +349,7 @@ static void overlayOpen(void) {
     s_open = 1;
     s_screen = OVL_SCREEN_MAIN;
     s_sel = 0;                                   /* always reopen at the top */
+    loadShowHiddenItems();
     langScan();                                  /* refresh the LANGUAGE picklist (cheap dir scan) */
     discScan();                                  /* refresh the DISC picklist (launcher env, cheap) */
     /* Dynamic ceilings: arrows clamp at the real last entry, confirm cycles first..last -- the

@@ -3905,3 +3905,10 @@ void Objf013_BattleMgr(Object *obj) {
       }
    }
 }
+
+#ifdef PC_FEAT
+/* Hidden-item markers on the overhead map view are US-only; these keep the shared engine.c linking. */
+void PC_HiddenItemLegendOpen(void) {}
+void PC_HiddenItemLegendClose(void) {}
+void PC_RenderHiddenItemMarkers(void) {}
+#endif

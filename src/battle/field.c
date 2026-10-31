@@ -3959,3 +3959,121 @@ void Objf013_BattleMgr(Object *obj) {
       }
    }
 }
+
+#ifdef PC_FEAT
+/* Hidden-item markers on the overhead map view (option "HIDDEN ITEMS", platform/pc/src/pc_overlay.c).
+ * Uncollected entries of gMapHiddenItems get a digit on their tile and a numbered legend window,
+ * both driven by Objf025_OverheadMapView. See docs/gameplay-additions.md, "Hidden-item markers". */
+extern int PC_ShowHiddenItems(void);
+void AddObjPrim3(u32 *ot, Object *obj);
+
+#define HIDDEN_ITEM_LEGEND_WINDOW 0x40
+
+static s32 s_hiddenItemLegendOpen = 0;
+
+/* Fills out[] with the gMapHiddenItems slots still on the field, in table order; returns the count. */
+static s32 GetVisibleHiddenItems(HiddenItem **out) {
+   s32 i, ct = 0;
+   HiddenItem *hi;
+
+   if (!PC_ShowHiddenItems() || gState.mapNum >= BATTLE_CT) {
+      return 0;
+   }
+   for (i = 0; i < 2; i++) {
+      hi = &gMapHiddenItems[gState.mapNum][i];
+      if (hi->item == ITEM_NULL || hi->x < gMapMinX || hi->x > gMapMaxX || hi->z < gMapMinZ ||
+          hi->z > gMapMaxZ) {
+         continue;
+      }
+      if ((i == 0) ? gState.mapState.s.foundHiddenItem1 : gState.mapState.s.foundHiddenItem2) {
+         continue;
+      }
+      out[ct++] = hi;
+   }
+   return ct;
+}
+
+void PC_HiddenItemLegendOpen(void) {
+   HiddenItem *items[2];
+   u8 line[16];
+   s8 *name;
+   s32 ct, i, j, len, maxLen;
+
+   ct = GetVisibleHiddenItems(items);
+   if (ct == 0) {
+      return;
+   }
+   maxLen = 0;
+   for (i = 0; i < ct; i++) {
+      len = GetItemNameLength(items[i]->item);
+      if (len > maxLen) {
+         maxLen = len;
+      }
+   }
+   DrawWindow(HIDDEN_ITEM_LEGEND_WINDOW, 0, 0, (maxLen + 3) * 8 + 24, ct * 18 + 18, 16, 16,
+              WBS_CROSSED, 0);
+   for (i = 0; i < ct; i++) {
+      line[0] = '1' + i;
+      line[1] = ':';
+      line[2] = ' ';
+      name = gItemNames[items[i]->item];
+      for (j = 0; j < 12 && name[j] != '\0'; j++) {
+         line[3 + j] = name[j];
+      }
+      line[3 + j] = '\0';
+      DrawText(12, i * 18 + 10, 20, 0, 0, line);
+   }
+   DisplayCustomWindow(HIDDEN_ITEM_LEGEND_WINDOW, 0, 1, 0, 0, 0);
+   s_hiddenItemLegendOpen = 1;
+}
+
+void PC_HiddenItemLegendClose(void) {
+   if (s_hiddenItemLegendOpen) {
+      CloseWindow(HIDDEN_ITEM_LEGEND_WINDOW);
+      s_hiddenItemLegendOpen = 0;
+   }
+}
+
+/* One flat digit per item, lifted above unit markers and kept upright on screen: with the camera
+ * pitched straight down, screen-right is (cos ry, sin ry) and screen-down (sin ry, -cos ry) in x/z. */
+void PC_RenderHiddenItemMarkers(void) {
+   HiddenItem *items[2];
+   Object *digit;
+   s32 ct, i, cx, cz, y, rx, rz, dx, dz;
+   const s32 half = CV(0.375);
+
+   ct = GetVisibleHiddenItems(items);
+   rx = (rcos(gCameraRotation.vy & 0xfff) * half) >> 12;
+   rz = (rsin(gCameraRotation.vy & 0xfff) * half) >> 12;
+   dx = rz;
+   dz = -rx;
+
+   for (i = 0; i < ct; i++) {
+      cx = items[i]->x * CV(1.0) + CV(0.5);
+      cz = items[i]->z * CV(1.0) + CV(0.5);
+      y = gTerrainPtr[items[i]->z][items[i]->x].s.elevation * CV(0.5) + CV(1.5);
+
+      digit = Obj_GetUnused();
+      digit->d.sprite.gfxIdx = GFX_DIGIT_1 + i;
+      digit->d.sprite.clut = CLUT_REDS;
+      digit->x1.n = cx;
+      digit->z1.n = cz;
+      digit->y1.n = y;
+
+      digit->d.sprite.coords[0].x = cx - rx - dx;
+      digit->d.sprite.coords[0].z = cz - rz - dz;
+      digit->d.sprite.coords[1].x = cx + rx - dx;
+      digit->d.sprite.coords[1].z = cz + rz - dz;
+      digit->d.sprite.coords[2].x = cx - rx + dx;
+      digit->d.sprite.coords[2].z = cz - rz + dz;
+      digit->d.sprite.coords[3].x = cx + rx + dx;
+      digit->d.sprite.coords[3].z = cz + rz + dz;
+      digit->d.sprite.coords[0].y = y;
+      digit->d.sprite.coords[1].y = y;
+      digit->d.sprite.coords[2].y = y;
+      digit->d.sprite.coords[3].y = y;
+
+      AddObjPrim3(gGraphicsPtr->ot, digit);
+   }
+}
+#endif

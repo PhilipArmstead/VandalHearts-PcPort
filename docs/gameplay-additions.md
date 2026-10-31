@@ -207,6 +207,21 @@ never blur together:
 
 ![A spell's area preview clearly distinct from the threat overlay](images/ThreatOverlay-AOEvisibility.png)
 
+### Hidden-item markers
+
+**Intent: find the items hidden under battle tiles without a guide.**
+
+Turn on **HIDDEN ITEMS** in the options overlay (SELECT+START; off by default, `VH_SHOW_HIDDEN_ITEMS`
+in the ini). The overhead map (Triangle / Y / `W`) then puts a digit on every tile that still hides
+an item, and a legend in the top-left corner names them (`1: Mad Book`, `2: L Sword`). Stand on the
+tile and choose **Examine** to collect it; collected items drop off the map and the legend, and the
+legend is not shown once a battle has none left.
+
+Implementation: `gMapHiddenItems` and the `foundHiddenItem1/2` flags in `src/battle/field.c` drive
+`PC_RenderHiddenItemMarkers` / `PC_HiddenItemLegendOpen`, called from `Objf025_OverheadMapView`.
+The digits are flat sprites lifted above the unit gems and rotated with the camera so they read
+upright. US game only — the Japanese core links no-op stubs and greys the overlay row.
+
 ### Battle fast-forward
 
 **Intent: keep tactical battles, skip the waiting.**

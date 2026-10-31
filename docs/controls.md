@@ -15,7 +15,7 @@ Nintendo-style pads.
 | D-pad / **left stick** | D-pad | Move the cursor |
 | South (A) | Cross | Cancel / back |
 | East (B) | Circle | Confirm — select a unit, choose an action, confirm a menu item |
-| North (Y) | Triangle | Overhead map view |
+| North (Y) | Triangle | Overhead map view (with **HIDDEN ITEMS** on, also numbers the hidden items) |
 | West (X) | Square | **(PC)** Toggle the enemy threat overlay |
 | **L1 / R1** (shoulders) | — | **(PC)** Cycle through your units — **L1** previous, **R1** next |
 | **Right stick** | — | **(PC)** Camera — horizontal = rotate, vertical = raise/lower the angle |
@@ -33,7 +33,7 @@ Options, Save, Load).
 | Arrow keys | D-pad | Move the cursor |
 | **S** | Cross | Cancel / back |
 | **D** | Circle | Confirm |
-| **W** | Triangle | Overhead map view |
+| **W** | Triangle | Overhead map view (with **HIDDEN ITEMS** on, also numbers the hidden items) |
 | **A** | Square | **(PC)** Toggle the enemy threat overlay |
 | **`[` / `]`** | — | **(PC)** Cycle through your units — `[` previous, `]` next |
 | **Q / E** | L1 / R1 | Camera rotate (left / right) |

@@ -16,6 +16,12 @@ void Objf047_BattleMapCursor(Object *);
 void Objf049_BattleMapCursorControl(Object *);
 void Objf019_Compass(Object *);
 void Objf025_OverheadMapView(Object *);
+#ifdef PC_FEAT
+/* Hidden-item markers and legend for the overhead map (src/battle/field.c; no-op stubs in JP). */
+void PC_HiddenItemLegendOpen(void);
+void PC_HiddenItemLegendClose(void);
+void PC_RenderHiddenItemMarkers(void);
+#endif
 void Noop_800190c0(void);
 void CalculateSubstepDeltas(s32, s32, s32, s32, s32, u32, s32 *, s32 *);
 s32 SmoothStepTo(Object *, s32, s32, s32);
@@ -398,6 +404,9 @@ void Objf025_OverheadMapView(Object *obj) {
    switch (obj->state) {
    case 0:
       CloseWindow(0x1e);
+#ifdef PC_FEAT
+      PC_HiddenItemLegendOpen();
+#endif
       gOverheadMapState = 1;
       gCameraRotation.vy &= 0xfff;
       OBJ.camSavedRotX = gCameraRotation.vx;
@@ -419,8 +428,14 @@ void Objf025_OverheadMapView(Object *obj) {
       gCameraPos.vx += (((-(gMapMaxX + 1) / 2) * 32) - gCameraPos.vx) >> 2;
       gCameraPos.vz += (((-(gMapMaxZ + 1) / 2) * 32) - gCameraPos.vz) >> 2;
       gCameraPos.vy += -gCameraPos.vy >> 2;
+#ifdef PC_FEAT
+      PC_RenderHiddenItemMarkers();
+#endif
 
       if ((gPadStateNewPresses & PAD_TRIANGLE) || (gPadStateNewPresses & PAD_X)) {
+#ifdef PC_FEAT
+         PC_HiddenItemLegendClose();
+#endif
          gOverheadMapState = 0;
          OBJ.delay = 25;
          obj->state++;
