@@ -623,6 +623,9 @@ int PC_GpuInit(int width, int height, const char *title) {
         return 0;
     }
     s_winW = width; s_winH = height;   /* the real (scaled) window size, for PC_GpuGetWindowSize */
+    /* SDL2 starts with text input on; under Wayland an active text-input session routes letter keys
+     * to the IME instead of the keyboard state, so WASD/QERF never reach PadRead. Nothing types text. */
+    SDL_StopTextInput();
     if (g_vhFullscreen)                /* apply the persisted fullscreen preference at startup */
         SDL_SetWindowFullscreen(s_window, SDL_WINDOW_FULLSCREEN_DESKTOP);
 #if defined(__APPLE__)
