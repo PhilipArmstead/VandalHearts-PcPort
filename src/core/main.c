@@ -52,6 +52,10 @@ void main(void) {
        * UpdateState: the title state's entry resets leftover objects before Obj_Execute runs one. */
       { extern void PC_ApplyReturnToTitle(void); PC_ApplyReturnToTitle(); }
 #endif
+#ifdef PC_FEAT
+      /* Battle rewind restores are deferred here for the same reason (pc_rewind.c). */
+      { extern void PC_ApplyRewind(void); PC_ApplyRewind(); }
+#endif
       UpdateState();
       UpdateEngine();
    }

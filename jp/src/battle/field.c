@@ -2475,6 +2475,12 @@ void Objf425_BattleOptions(Object *obj) {
       s_menuMem_battleOptions_801231fc = 0;
       if (gSignal1 == 0) {
 #ifdef PC_FEAT
+         /* Battle rewind: this free-cursor frame is where each player turn's snapshot is taken.
+          * See docs/gameplay-additions.md, "Battle rewind". */
+         if (!gIsEnemyTurn && !gPlayerControlSuppressed && !gClearSavedPadState) {
+            extern void PC_RewindIdleTick(void);
+            PC_RewindIdleTick();
+         }
          /* Square toggles the enemy threat overlay -- the union of every living enemy's move+attack
           * reach, drawn purple. See docs/gameplay-additions.md, "Enemy threat overlay". */
          if ((gSavedPadStateNewPresses & PAD_SQUARE) && !gPlayerControlSuppressed &&

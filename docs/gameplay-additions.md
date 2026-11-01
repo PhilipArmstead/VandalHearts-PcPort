@@ -222,6 +222,38 @@ Implementation: `gMapHiddenItems` and the `foundHiddenItem1/2` flags in `src/bat
 The digits are flat sprites lifted above the unit gems and rotated with the camera so they read
 upright. US game only — the Japanese core links no-op stubs and greys the overlay row.
 
+### Battle rewind
+
+**Intent: undo a bad turn without reloading a save.**
+
+Turn on **REWIND (F1)** in the options overlay (SELECT+START; off by default, `VH_REWIND` in the
+ini). From then on, the first moment of each player turn when the cursor is free stores that turn.
+During your turn, with no unit selected and no menu open, press **F1** to list the stored turns
+(newest first). Pick one and confirm: the battle fades out and reloads at the start of that turn.
+Every later stored turn is dropped, and the turns you play from there are stored in their place.
+Picking the turn in progress, marked `(RESTART)`, restarts it.
+
+Rewinding restores the units (position, HP, MP, status, items), the party, the map's chests, crates
+and boulders, the map event flags (including collected hidden items), gold, the depot, kill rewards,
+the turn number, and the camera and cursor. Stored turns live in memory only. They are cleared when
+a new battle starts, when the battle is retried or loaded from a save, on RETURN TO TITLE, and when
+the option is turned off.
+
+Implementation: each snapshot is the retail in-battle (suspend) save, `CardFileData_InBattleSave`,
+filled by `Card_PopulateInBattleSave` and kept in `platform/pc/src/pc_rewind.c`.
+- **Capture:** `PC_RewindIdleTick` runs from the free-cursor branch of `Objf425_BattleOptions`
+  (`src/battle/field.c`) and stores one snapshot per new `gState.turn`.
+- **Restore:** `PC_ApplyRewind` runs at the top of the main loop, beside `PC_ApplyReturnToTitle`.
+  It loads the snapshot with `Card_LoadInBattleSaveFromBuf` and enters
+  `STATE_LOAD_IN_BATTLE_SAVE`. That reuses the retail rebuild that loading a suspend save performs.
+- **List lifetime:** `PC_RewindBattleStart` (`src/battle/evaluators.c`) keeps the list only across
+  the rewind's own reload.
+
+The rebuild has the retail suspend save's limits:
+- Per-map battle scripts restart from the saved event flags rather than from their exact
+  mid-script state.
+- The random sequence is not restored, so repeating the same moves can give different rolls.
+
 ### Battle fast-forward
 
 **Intent: keep tactical battles, skip the waiting.**

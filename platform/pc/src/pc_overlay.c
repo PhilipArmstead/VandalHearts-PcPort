@@ -5,6 +5,7 @@
 #include "pc_platform.h"   /* PC_SaveIniConfig, PC_GpuSetScale/SetFullscreen, g_vhScale/g_vhFullscreen */
 #include "pc_saves.h"      /* archive list + backup/restore/delete */
 #include "pc_balance.h"    /* gTacticalMode, PC_SyncBalance, PC_AtTitleMenu */
+#include "pc_rewind.h"     /* battle rewind snapshots (F1 screen) */
 /* Game headers for the RETURN TO TITLE action: the menu MODEL stays game-agnostic, but this one
  * action rewrites engine state directly. */
 #include "common.h"        /* s16, gPlayerControlSuppressed */
@@ -52,6 +53,8 @@ static const char *const s_internalResText[] = { "", "OFF", "X2", "X3", "X4" };
 /* Applying the Tactical Mode toggle: set the mode and re-sync the balance patch (idempotent). The
  * save folder follows automatically (PC_SaveDir reads gTacticalMode). */
 static void apply_tactical(int nv) { gTacticalMode = nv; PC_SyncBalance(); }
+/* REWIND: turning it off drops every stored turn, so a later re-enable starts a fresh list. */
+static void apply_rewind(int nv)   { PC_RewindSetEnabled(nv); }
 
 /* HD PACK coupling: HD renders only at INTERNAL RES > 1 and, windowed, is only VISIBLE at WINDOW
  * SCALE > 1, so enabling HD bumps both to at least 2; dropping either back to 1 disables HD again
@@ -271,6 +274,8 @@ static Item s_items[] = {
       "OFF", "ON",            0, 0, 0, NULL, apply_tactical,      NULL,           dis_notAtTitle, dis_notAtTitle },
     { "HIDDEN ITEMS",    OVL_TOGGLE, &s_showHiddenItems, "gameplay", "VH_SHOW_HIDDEN_ITEMS",
       "OFF", "ON",            0, 0, 0, NULL, NULL,                NULL,           dis_jpCore, dis_jpCore },
+    { "REWIND (F1)",     OVL_TOGGLE, &g_vhRewind,     "gameplay", "VH_REWIND",
+      "OFF", "ON",            0, 0, 0, NULL, apply_rewind,        NULL,           NULL, NULL },
     /* Greyed+locked with no valid pack; toggleable + auto-ON when one is installed. apply_hdpack
      * couples it to INTERNAL RES / WINDOW SCALE (see above). */
     { "HD PACK",         OVL_TOGGLE, &g_vhHdPack,     "video",  "VH_HDPACK",
@@ -305,7 +310,7 @@ static Item s_items[] = {
 
 /* ---- state ------------------------------------------------------------------------------------- */
 
-enum { CONF_RESTORE, CONF_DELETE, CONF_RETURN_TITLE, CONF_QUIT };
+enum { CONF_RESTORE, CONF_DELETE, CONF_RETURN_TITLE, CONF_QUIT, CONF_REWIND };
 
 static int s_open   = 0;
 static int s_screen = OVL_SCREEN_MAIN;
@@ -320,6 +325,9 @@ static int  s_confKind = CONF_DELETE;       /* CONFIRM: which action */
 static char s_confFile[64];                 /* CONFIRM: target archive filename */
 static char s_confLabel[24];                /* CONFIRM: target archive display label */
 static int  s_confSel  = 0;                 /* CONFIRM: option cursor */
+
+static int  s_rewindSel = 0;                /* REWIND cursor (row 0 = newest turn) */
+static char s_rewindMsg[32];                /* CONFIRM question for CONF_REWIND */
 
 static PC_SaveCard s_detail;                /* DETAIL: the inspected archive's 3 slots */
 static char s_detailLabel[24];              /* DETAIL: the inspected archive's label */
@@ -350,6 +358,7 @@ static void overlayOpen(void) {
     s_screen = OVL_SCREEN_MAIN;
     s_sel = 0;                                   /* always reopen at the top */
     loadShowHiddenItems();
+    PC_RewindLoadSetting();
     langScan();                                  /* refresh the LANGUAGE picklist (cheap dir scan) */
     discScan();                                  /* refresh the DISC picklist (launcher env, cheap) */
     /* Dynamic ceilings: arrows clamp at the real last entry, confirm cycles first..last -- the
@@ -521,6 +530,45 @@ void PC_ApplyReturnToTitle(void) {
     gState.state4    = 0;
     gState.state7    = 1;
     PC_SyncBalance();   /* keep patchApplied == gTacticalMode consistent */
+    PC_RewindClear();   /* stored turns belong to the abandoned battle */
+}
+
+/* ---- BATTLE REWIND. F1 opens this screen straight from the free battle cursor; the confirm only
+ * REQUESTS the restore, which PC_ApplyRewind performs at the top of the main loop. ------------- */
+static int rewindRowEntry(int row) { return PC_RewindCount() - 1 - row; }   /* newest first */
+
+void PC_OverlayOpenRewind(void) {
+    if (s_open) {                 /* F1 again closes the rewind menu; other screens ignore it */
+        if (s_screen == OVL_SCREEN_REWIND ||
+            (s_screen == OVL_SCREEN_CONFIRM && s_confKind == CONF_REWIND))
+            s_open = 0;
+        return;
+    }
+    if (!PC_RewindCanOpen()) return;
+    overlayOpen();
+    s_screen = OVL_SCREEN_REWIND;
+    s_rewindSel = 0;
+}
+
+static void rewindInput(int b) {
+    int n = PC_RewindCount();
+    switch (b) {
+    case OVL_BTN_UP:     if (s_rewindSel > 0) s_rewindSel--; break;
+    case OVL_BTN_DOWN:   if (s_rewindSel < n - 1) s_rewindSel++; break;
+    case OVL_BTN_CIRCLE:
+        if (n > 0) {
+            snprintf(s_rewindMsg, sizeof(s_rewindMsg), "REWIND TO TURN %d?",
+                     PC_RewindTurn(rewindRowEntry(s_rewindSel)));
+            strncpy(s_confLabel, "LATER PROGRESS LOST", sizeof(s_confLabel) - 1);
+            s_confLabel[sizeof(s_confLabel) - 1] = '\0';
+            s_confKind = CONF_REWIND;
+            s_confSel  = 0;           /* NO */
+            s_screen   = OVL_SCREEN_CONFIRM;
+        }
+        break;
+    case OVL_BTN_CROSS:  s_open = 0; break;   /* opened by F1: close entirely */
+    default: break;
+    }
 }
 
 static void openDetail(void) {
@@ -557,6 +605,11 @@ static void savesInput(int b) {
 static int confCount(void) { return (s_confKind == CONF_RESTORE) ? 3 : 2; }
 
 static void execConfirm(void) {
+    if (s_confKind == CONF_REWIND) {
+        if (s_confSel == 1) { PC_RewindRequest(rewindRowEntry(s_rewindSel)); s_open = 0; }
+        else                { s_screen = OVL_SCREEN_REWIND; }
+        return;
+    }
     if (s_confKind == CONF_QUIT) {
         /* yes: quit (exactly what Escape did before this feature); no: opened by Escape, so close
          * entirely rather than falling back to MAIN. Either way the overlay closes. */
@@ -602,6 +655,7 @@ static void confirmInput(int b) {
     case OVL_BTN_CROSS:  /* cancel -> back to where the confirm was opened from */
         if (s_confKind == CONF_QUIT)              s_open = 0;   /* opened by Escape: close entirely */
         else if (s_confKind == CONF_RETURN_TITLE) s_screen = OVL_SCREEN_MAIN;
+        else if (s_confKind == CONF_REWIND)       s_screen = OVL_SCREEN_REWIND;
         else                                       s_screen = OVL_SCREEN_SAVES;
         break;
     default: break;
@@ -623,6 +677,8 @@ void PC_OverlayInput(int b) {
         }
     } else if (s_screen == OVL_SCREEN_SAVES) {
         savesInput(b);
+    } else if (s_screen == OVL_SCREEN_REWIND) {
+        rewindInput(b);
     } else if (s_screen == OVL_SCREEN_DETAIL) {
         if (b == OVL_BTN_CROSS || b == OVL_BTN_START) s_screen = OVL_SCREEN_SAVES;  /* back */
     } else {
@@ -637,10 +693,12 @@ void PC_OverlayInput(int b) {
  * render here anyway; English keeps every language's behaviour identical. */
 const char *PC_OverlayTitle(void) {
     if (s_screen == OVL_SCREEN_SAVES) return "SAVE MANAGEMENT";
+    if (s_screen == OVL_SCREEN_REWIND) return "REWIND BATTLE";
     /* CONFIRM: save-mgmt confirms belong to that screen; return-to-title is an OPTIONS action;
      * quit gets its own title (it wasn't opened from either the settings list or the archive browser). */
     if (s_screen == OVL_SCREEN_CONFIRM) {
         if (s_confKind == CONF_QUIT) return "QUIT";
+        if (s_confKind == CONF_REWIND) return "REWIND BATTLE";
         return (s_confKind == CONF_RETURN_TITLE) ? "OPTIONS" : "SAVE MANAGEMENT";
     }
     return "OPTIONS";
@@ -719,6 +777,7 @@ int PC_OverlaySaveActive(int i) {   /* 1 if row i matches the current active car
 const char *PC_OverlayConfirmMsg(void) {
     if (s_confKind == CONF_QUIT)         return "QUIT THE GAME?";
     if (s_confKind == CONF_RETURN_TITLE) return "RETURN TO TITLE?";
+    if (s_confKind == CONF_REWIND)       return s_rewindMsg;
     return (s_confKind == CONF_RESTORE) ? "REPLACE CURRENT CARD?" : "DELETE THIS BACKUP?";
 }
 int PC_OverlayConfirmCount(void) { return confCount(); }
@@ -726,14 +785,17 @@ int PC_OverlayConfirmSelected(void) { return s_confSel; }
 const char *PC_OverlayConfirmTarget(void) { return s_confLabel; }   /* the archive label being acted on */
 /* A destructive confirm gets ONE red "eye-catch" line, on the element that matters most: DELETE /
  * RESTORE -> the QUESTION line (the target is a neutral backup date; delete is permanent, restore
- * overwrites the current card); RETURN TO TITLE / QUIT -> the TARGET line, itself the stakes warning. */
+ * overwrites the current card); RETURN TO TITLE / QUIT / REWIND -> the TARGET line, itself the stakes warning. */
 int PC_OverlayConfirmMsgWarn(void)    { return s_confKind == CONF_DELETE || s_confKind == CONF_RESTORE; }
-int PC_OverlayConfirmTargetWarn(void) { return s_confKind == CONF_RETURN_TITLE || s_confKind == CONF_QUIT; }
+int PC_OverlayConfirmTargetWarn(void) { return s_confKind == CONF_RETURN_TITLE || s_confKind == CONF_QUIT ||
+                                               s_confKind == CONF_REWIND; }
 const char *PC_OverlayConfirmOption(int i) {
     static const char *RESTORE[3] = { "BACK UP THEN RESTORE", "RESTORE ONLY", "CANCEL" };
     static const char *DELETE_[2] = { "DELETE", "CANCEL" };
     static const char *RETTITLE[2] = { "RETURN TO TITLE", "CANCEL" };
     static const char *QUIT[2] = { "NO", "YES, QUIT" };
+    static const char *REWIND[2] = { "NO", "YES, REWIND" };
+    if (s_confKind == CONF_REWIND)       return (i >= 0 && i < 2) ? REWIND[i] : "";
     if (s_confKind == CONF_QUIT)         return (i >= 0 && i < 2) ? QUIT[i] : "";
     if (s_confKind == CONF_RETURN_TITLE) return (i >= 0 && i < 2) ? RETTITLE[i] : "";
     if (s_confKind == CONF_RESTORE)      return (i >= 0 && i < 3) ? RESTORE[i] : "";
@@ -744,4 +806,17 @@ const char *PC_OverlayDetailTitle(void) { return s_detailLabel; }
 const char *PC_OverlayDetailSlot(int i) {
     if (i < 0 || i > 2 || !s_detail.occupied[i]) return NULL;   /* NULL => renderer shows "EMPTY" */
     return s_detail.slot[i];
+}
+
+/* REWIND screen -- stored turns, newest first. Row text is "TURN n", plus a marker on the turn
+ * in progress (restoring it restarts that turn). */
+int  PC_OverlayRewindCount(void)    { return PC_RewindCount(); }
+int  PC_OverlayRewindSelected(void) { return s_rewindSel; }
+const char *PC_OverlayRewindLabel(int row) {
+    static char buf[32];
+    int e = rewindRowEntry(row), turn;
+    if (e < 0 || e >= PC_RewindCount()) return NULL;
+    turn = PC_RewindTurn(e);
+    snprintf(buf, sizeof(buf), (turn == PC_RewindCurrentTurn()) ? "TURN %d (RESTART)" : "TURN %d", turn);
+    return buf;
 }

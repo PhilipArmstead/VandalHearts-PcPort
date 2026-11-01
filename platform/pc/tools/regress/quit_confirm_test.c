@@ -45,6 +45,16 @@ int PC_LangListPacks(char folders[][64], char names[][64], int max) {
     (void)folders; (void)names; (void)max; return 0;
 }
 const char *PC_LangBootFolder(void) { return ""; }
+/* Battle rewind (pc_rewind.c): no stored turns, so F1 never opens the REWIND screen here. */
+int g_vhRewind = 0;
+void PC_RewindLoadSetting(void) {}
+void PC_RewindSetEnabled(int on) { g_vhRewind = on; }
+void PC_RewindClear(void) {}
+int  PC_RewindCanOpen(void) { return 0; }
+int  PC_RewindCount(void) { return 0; }
+int  PC_RewindTurn(int i) { (void)i; return 0; }
+int  PC_RewindCurrentTurn(void) { return 0; }
+void PC_RewindRequest(int i) { (void)i; }
 /* PC_ApplyReturnToTitle's own body-local externs -- never reached by these fixtures. */
 void Movie_AbortForReturnToTitle(void) {}
 void PC_GpuSetMovieOverlay(const unsigned short *bgr555, int w, int h) {

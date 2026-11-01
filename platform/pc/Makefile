@@ -31,7 +31,7 @@ SRC_DIR        := ../../src
 GAME_REL       := $(patsubst $(GAME_ROOT)/src/%,%,$(wildcard $(GAME_ROOT)/src/*.c $(GAME_ROOT)/src/*/*.c))
 GAME_O_FILES   := $(addprefix $(BUILD_DIR)/src/,$(GAME_REL:.c=.o))
 
-BACKEND_SRCS   := libetc.c pc_lang.c pc_lang_list.c pc_lang_font.c pc_diag.c pc_battle_speed.c libcd.c libsnd.c libspu.c libkernel.c libgte.c libgpu.c pc_raster.c pc_gpu_trace.c pc_hdpack.c pc_gpu_window.c libsn.c pc_bootstrap.c pc_xa.c pc_mdec.c pc_kanji_font.c pc_spu.c pc_overlay.c pc_saves.c pc_movie_subs.c pc_balance.c pc_hdvideo.c
+BACKEND_SRCS   := libetc.c pc_lang.c pc_lang_list.c pc_lang_font.c pc_diag.c pc_battle_speed.c libcd.c libsnd.c libspu.c libkernel.c libgte.c libgpu.c pc_raster.c pc_gpu_trace.c pc_hdpack.c pc_gpu_window.c libsn.c pc_bootstrap.c pc_xa.c pc_mdec.c pc_kanji_font.c pc_spu.c pc_overlay.c pc_saves.c pc_movie_subs.c pc_balance.c pc_rewind.c pc_hdvideo.c
 ifeq ($(REGION),jp)
 # The langpack engine is US-only by design (built on the US ASCII text path); the JP core
 # links pc_lang_stub.c (the engine's documented no-pack behaviour) instead.
@@ -469,6 +469,10 @@ $(BUILD_DIR)/pc_gpu_window.o: src/pc_gpu_window.c
 # In-game options overlay model + its RETURN TO TITLE action, which rewrites engine state
 # (gState etc.), so it compiles through the staged game headers with pc_balance.o's profile.
 $(BUILD_DIR)/pc_overlay.o: src/pc_overlay.c | stage
+	$(CC) $(M32) $(SAN) $(PORT_WARN) -fno-builtin-csqrt -std=gnu89 -DPERMUTER -I$(STAGE_DIR) -Iinclude -MMD -MP -c -o $@ $<
+
+# Battle rewind snapshots -- fills/loads the game's in-battle save struct, so the staged profile too.
+$(BUILD_DIR)/pc_rewind.o: src/pc_rewind.c | stage
 	$(CC) $(M32) $(SAN) $(PORT_WARN) -fno-builtin-csqrt -std=gnu89 -DPERMUTER -I$(STAGE_DIR) -Iinclude -MMD -MP -c -o $@ $<
 
 # Save-management file ops -- pure C, no SDL/game headers.

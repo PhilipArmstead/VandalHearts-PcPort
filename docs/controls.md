@@ -42,6 +42,7 @@ Options, Save, Load).
 | Enter | Start | Battle menu / options; skips an intro movie |
 | Space | Select | Select — used only for the overlay chord below |
 | **Space + Enter** (chord) | — | **(PC)** Open / close the in-game options overlay |
+| **F1** | — | **(PC)** Battle rewind menu — with **REWIND (F1)** on, lists the stored player turns to return to (free cursor only) |
 | **Esc** | — | **(PC)** Quit immediately at the title screen or its logo/title-attract videos; otherwise a quit prompt (No / Yes) — No is the default |
 
 The window close button quits immediately, with no prompt.

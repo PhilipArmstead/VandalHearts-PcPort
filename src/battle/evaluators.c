@@ -152,6 +152,10 @@ s32 State_Battle(void) {
          gShowThreatGrid = 0;   /* Stage 3 (1.1B): every battle starts with the threat overlay off, so
                                  * it can never linger from a prior battle into UpdateInput's per-frame
                                  * recompute (which now runs in all phases). */
+         {
+            extern void PC_RewindBattleStart(void);
+            PC_RewindBattleStart();   /* keeps rewind snapshots only across a rewind's own reload */
+         }
 #endif
          gState.lastSelectedUnit = 1;
          gState.mapCursorOutOfRange = 0;

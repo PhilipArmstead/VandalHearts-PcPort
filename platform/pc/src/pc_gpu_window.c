@@ -570,8 +570,51 @@ static void drawDetail(int w, int h) {
     ovlText(w, h, px + (panelW - ovlTextPx(LEG, scale)) / 2, ty, scale, LEG, 150, 170, 190);
 }
 
+/* REWIND: stored battle turns, newest first (scrolls), and a 1-line legend. */
+static void drawRewind(int w, int h) {
+    const char *LEG = OVL_LABELS_XBOX ? "B: REWIND   A: CLOSE" : "@: REWIND   ~: CLOSE";
+    const int MAXVIS = 8;
+    const char *title = PC_OverlayTitle();
+    int count = PC_OverlayRewindCount(), sel = PC_OverlayRewindSelected();
+    int scale, i, base, visN, scrollOff = 0, bodyLines;
+    int padX, padY, lineH, titleGap, panelW, panelH, px, py, ty;
+
+    base = ovlTextPx(title, 1);
+    if (ovlTextPx(LEG, 1) > base) base = ovlTextPx(LEG, 1);
+    for (i = 0; i < count; i++) { int lw = ovlTextPx(PC_OverlayRewindLabel(i), 1); if (lw > base) base = lw; }
+    visN = (count < MAXVIS) ? count : MAXVIS;
+    if (count > MAXVIS) {                                /* scroll window follows the cursor */
+        scrollOff = sel - MAXVIS / 2;
+        if (scrollOff < 0) scrollOff = 0;
+        if (scrollOff > count - MAXVIS) scrollOff = count - MAXVIS;
+    }
+    bodyLines = visN + 1 /*separator*/ + 1 /*legend*/;
+
+    scale = ovlSharedScale(w);   /* all screens use the main list's scale (consistent) */
+    padX = OVL_PADX1 * scale; padY = OVL_PADY1 * scale; lineH = OVL_LINE1 * scale; titleGap = OVL_TGAP1 * scale;
+    panelW = base * scale + 2 * padX;
+    panelH = padY + OVL_GLY1 * scale + titleGap + bodyLines * lineH + padY;
+    px = (w - panelW) / 2; py = (h - panelH) / 2;
+    ovlPanelBox(w, h, px, py, panelW, panelH);
+    ty = py + padY;
+    ovlText(w, h, px + (panelW - ovlTextPx(title, scale)) / 2, ty, scale, title, 168, 198, 236);
+    ty += OVL_GLY1 * scale + titleGap;
+    for (i = 0; i < visN; i++) {
+        int idx = scrollOff + i, selected = (idx == sel);
+        const char *label = PC_OverlayRewindLabel(idx);
+        int lr = selected ? 122 : 200, lg = selected ? 182 : 206, lb = selected ? 240 : 214;
+        if (selected) ovlFillRect(w, h, px + 3, ty - 2, panelW - 6, OVL_GLY1 * scale + 3, 48, 56, 72, 235);
+        ovlText(w, h, px + padX, ty, scale, label ? label : "", lr, lg, lb);
+        ty += lineH;
+    }
+    ovlFillRect(w, h, px + padX, ty + OVL_GLY1 * scale / 2, panelW - 2 * padX, 1, 92, 108, 134, 200);
+    ty += lineH;
+    ovlText(w, h, px + (panelW - ovlTextPx(LEG, scale)) / 2, ty, scale, LEG, 150, 170, 190);
+}
+
 void PC_GpuDrawOverlay(int w, int h) {
     switch (PC_OverlayScreen()) {
+    case OVL_SCREEN_REWIND:  drawRewind(w, h);  break;
     case OVL_SCREEN_SAVES:   drawSaves(w, h);   break;
     case OVL_SCREEN_CONFIRM: drawConfirm(w, h); break;
     case OVL_SCREEN_DETAIL:  drawDetail(w, h);  break;
@@ -731,7 +774,7 @@ void PC_GpuSetMovieOverlay(const unsigned short *bgr555, int w, int h) {
     s_movieOverlay = bgr555; s_movieOverlayRGB = NULL; s_movieOvW = w; s_movieOvH = h;
 }
 /* Pump + drain SDL events -- SDL_QUIT (close button / Ctrl+C) exits immediately; Escape asks first
- * via the overlay's quit confirm (PC_OverlayRequestQuit). Polling also refreshes
+ * via the overlay's quit confirm (PC_OverlayRequestQuit); F1 opens the battle rewind menu. Polling also refreshes
  * SDL_GetKeyboardState for PadRead; called from the present path AND every VSync. */
 void PC_GpuPumpEvents(void) {
     SDL_Event ev;
@@ -740,6 +783,8 @@ void PC_GpuPumpEvents(void) {
             exit(0);
         } else if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_ESCAPE && ev.key.repeat == 0) {
             PC_OverlayRequestQuit();
+        } else if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_F1 && ev.key.repeat == 0) {
+            PC_OverlayOpenRewind();   /* battle rewind menu (free battle cursor only) */
         }
     }
 }

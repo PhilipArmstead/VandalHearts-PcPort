@@ -10,11 +10,12 @@ enum {
     OVL_BTN_CIRCLE, OVL_BTN_CROSS, OVL_BTN_SQUARE, OVL_BTN_TRIANGLE, OVL_BTN_START
 };
 /* Current screen. */
-enum { OVL_SCREEN_MAIN, OVL_SCREEN_SAVES, OVL_SCREEN_CONFIRM, OVL_SCREEN_DETAIL };
+enum { OVL_SCREEN_MAIN, OVL_SCREEN_SAVES, OVL_SCREEN_CONFIRM, OVL_SCREEN_DETAIL, OVL_SCREEN_REWIND };
 
 int  PC_OverlayIsOpen(void);
 void PC_OverlayToggle(void);        /* chord: open <-> close (always reopens on the MAIN screen) */
 void PC_OverlayInput(int button);   /* one OVL_BTN_* edge from the pad filter */
+void PC_OverlayOpenRewind(void);    /* F1: open the REWIND screen (free battle cursor only), or close it */
 
 int  PC_OverlayScreen(void);        /* OVL_SCREEN_* */
 const char *PC_OverlayTitle(void);  /* the current screen's title */
@@ -46,5 +47,10 @@ int  PC_OverlayConfirmSelected(void);
 /* DETAIL screen -- the 3 slots inside the inspected archive. */
 const char *PC_OverlayDetailTitle(void);   /* the archive's label (date) */
 const char *PC_OverlayDetailSlot(int i);   /* slot i's caption (0..2), or NULL if empty */
+
+/* REWIND screen -- stored battle turns, newest first. */
+int  PC_OverlayRewindCount(void);
+int  PC_OverlayRewindSelected(void);
+const char *PC_OverlayRewindLabel(int row);   /* "TURN n" (+ " (RESTART)" on the current turn) */
 
 #endif

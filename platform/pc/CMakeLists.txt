@@ -168,7 +168,7 @@ if(APPLE)
 endif()
 
 # Backend + hand-written data files, grouped by their Makefile compile profile.
-set(BACKEND_PLAIN   pc_lang pc_lang_list pc_lang_font libcd libspu libkernel libgpu pc_raster pc_gpu_trace pc_hdpack libsn pc_bootstrap pc_xa pc_spu pc_mdec pc_kanji_font pc_overlay pc_saves pc_movie_subs pc_hdvideo)
+set(BACKEND_PLAIN   pc_lang pc_lang_list pc_lang_font libcd libspu libkernel libgpu pc_raster pc_gpu_trace pc_hdpack libsn pc_bootstrap pc_xa pc_spu pc_mdec pc_kanji_font pc_overlay pc_rewind pc_saves pc_movie_subs pc_hdvideo)
 if(VH_REGION STREQUAL "jp")
     # Langpack is US-only by design; the JP core links the documented no-pack stubs instead.
     list(REMOVE_ITEM BACKEND_PLAIN pc_lang pc_lang_font)
@@ -329,6 +329,12 @@ set_source_files_properties(${PC_DIR}/src/pc_overlay.c PROPERTIES
     COMPILE_OPTIONS "-std=gnu89"
     INCLUDE_DIRECTORIES "${STAGE_DIR};${PC_DIR}/include")
 
+# pc_rewind.c fills and loads the game's in-battle save struct: same staged profile.
+set_source_files_properties(${PC_DIR}/src/pc_rewind.c PROPERTIES
+    COMPILE_DEFINITIONS "PERMUTER"
+    COMPILE_OPTIONS "-std=gnu89"
+    INCLUDE_DIRECTORIES "${STAGE_DIR};${PC_DIR}/include")
+
 # -- warning policy on PORT code (the stems the Makefile treats as backend) -----------------------
 # MUST come after every set_source_files_properties above: that call OVERWRITES COMPILE_OPTIONS,
 # so these appends would otherwise be silently clobbered.
@@ -336,7 +342,7 @@ foreach(_b ${BACKEND_PLAIN} libetc pc_diag pc_battle_speed libsnd libgte pc_gpu_
     vh_source_path(_port_source "${_b}")
     set_property(SOURCE ${_port_source} APPEND PROPERTY COMPILE_OPTIONS "${PORT_WARN}")
 endforeach()
-foreach(_b libetc libsnd pc_balance pc_overlay)   # compile through the staged game headers -> game csqrt(int) decl
+foreach(_b libetc libsnd pc_balance pc_overlay pc_rewind)   # compile through the staged game headers -> game csqrt(int) decl
     set_property(SOURCE ${PC_DIR}/src/${_b}.c APPEND PROPERTY COMPILE_OPTIONS "-fno-builtin-csqrt")
 endforeach()
 
